@@ -304,7 +304,8 @@
     display: grid;
     grid-template-areas:
       "dodge charge"
-      "attack attack";
+      "attack attack"
+      "mega mega";
     gap: 8px;
     pointer-events: auto;
     touch-action: none;
@@ -342,6 +343,15 @@
     border-color: var(--neon-blue);
     font-size: 11.5px;
     box-shadow: 0 0 16px rgba(0, 229, 255, 0.4);
+  }
+  .action-btn.mega-btn {
+    grid-area: mega;
+    width: clamp(96px, 20vw, 116px);
+    height: clamp(34px, 7vh, 40px);
+    border-color: var(--alert-red);
+    background: linear-gradient(135deg, rgba(255,42,75,0.3), rgba(35,8,18,0.95));
+    box-shadow: 0 0 16px rgba(255, 42, 75, 0.4);
+    color: #ffd6dc;
   }
   .action-btn.charge-btn {
     grid-area: charge;
@@ -666,14 +676,14 @@
     <button class="util-btn" id="btnLandscapeToggle" title="Toggle Landscape/Fullscreen">📱 ROTATE</button>
   </div>
 
-  <!-- HUD: HP on left (100 HP, NO hearts, perfectly visible), Timer in center, MoonEvil on right -->
+  <!-- HUD: HP on left (200 HP, NO hearts, perfectly visible), Timer in center, MoonEvil on right -->
   <div id="hud">
     <div class="hud-top-bar">
-      <!-- Player Stats: 100 HP (Instant Defeat on 0 HP) -->
+      <!-- Player Stats: 200 HP (Instant Defeat on 0 HP) -->
       <div class="player-status-card">
         <div class="unit-title">
           <span>ASTRONAUT</span>
-          <span id="playerHpNum">100 HP</span>
+          <span id="playerHpNum">200 HP</span>
         </div>
         <div class="bar-container">
           <div class="health-fill" id="playerHealthBar" style="width: 100%;"></div>
@@ -703,7 +713,7 @@
         </div>
         <div style="display:flex; justify-content:space-between; font-size:9px; color:rgba(255,255,255,0.6);">
           <span>TITAN SHIELD</span>
-          <span id="bossHpPercent">100%</span>
+          <span id="bossHpPercent">500 HP</span>
         </div>
       </div>
     </div>
@@ -734,6 +744,10 @@
           <span class="btn-key">E</span>
           ⚔️ ATTACK
         </button>
+        <button class="action-btn mega-btn interactive" id="btnMegaAttack">
+          <span class="btn-key">Q</span>
+          💥 MEGA -100 HP
+        </button>
       </div>
     </div>
   </div>
@@ -757,7 +771,7 @@
           <p>Phase 1 (100%→70%): Orbs &amp; swings.<br>Phase 2 (70%→40%): Orbital strikes &amp; minions.<br>Phase 3 (40%→0%): Frenzy attacks.</p>
         </div>
         <div class="briefing-card">
-          <h4>⚠️ 100 HP (HARDCORE)</h4>
+          <h4>⚠️ 200 HP (HARDCORE)</h4>
           <p>No extra hearts or lives! If your HP hits 0, you immediately fail and must restart.</p>
         </div>
       </div>
@@ -1146,7 +1160,7 @@ function showDamageNumber(text, x, y, color) {
 }
 
 /* ============================================================
-   4. GAME STATE (100 HP Hardcore, No Hearts, 3 Phases + Bomb)
+   4. GAME STATE (200 HP Hardcore, No Hearts, 3 Phases + Bomb)
    ============================================================ */
 const GAME_STATES = {
   PROLOGUE: 'PROLOGUE',
@@ -1166,9 +1180,9 @@ const gameState = {
   // Boss Battle Stats
   bossTimer: 480, // 8 minutes = 480s
   bombTimer: 240, // 4 minutes = 240s
-  bossHp: 100,
-  bossMaxHp: 100,
-  bossPhase: 1, // 1: 100->70, 2: 70->40, 3: 40->0
+  bossHp: 500,
+  bossMaxHp: 500,
+  bossPhase: 1, // 1: 500->450, 2: 450->300, 3: 300->0
   bossAttackTimer: 1.5,
   bossState: 'idle',
   bossX: 0.74,
@@ -1177,14 +1191,15 @@ const gameState = {
   bossHoverAngle: 0,
   bossInvulnT: 0,
 
-  // Player Stats (Strict 100 HP, NO hearts, Instant loss on 0 HP)
+  // Player Stats (Strict 200 HP, NO hearts, Instant loss on 0 HP)
   playerX: 0.20,
   playerY: 0.68,
-  playerHp: 100,
-  playerMaxHp: 100,
+  playerHp: 200,
+  playerMaxHp: 200,
   playerInvulnT: 0,
   playerDodgeCd: 0,
   playerAtkCd: 0,
+  megaAttackCd: 0,
   playerCharge: 0,
   playerCharging: false,
   isHoldingAttack: false, // Allows continuous auto-slashing while running!
@@ -1585,8 +1600,8 @@ function initGame() {
   gameState.prologueStep = 0;
   gameState.playerX = 0.15;
   gameState.playerY = 0.68;
-  gameState.playerHp = 100;
-  gameState.bossHp = 100;
+  gameState.playerHp = gameState.playerMaxHp;
+  gameState.bossHp = gameState.bossMaxHp;
   gameState.bossPhase = 1;
   gameState.bossTimer = 480;
   gameState.bombTimer = 240;
@@ -1601,16 +1616,16 @@ function initGame() {
 function updateHUDUI() {
   const hpEl = document.getElementById('playerHealthBar');
   const hpNum = document.getElementById('playerHpNum');
-  if (hpEl) hpEl.style.width = Math.max(0, gameState.playerHp) + '%';
+  if (hpEl) hpEl.style.width = (Math.max(0, gameState.playerHp) / gameState.playerMaxHp * 200) + '%';
   if (hpNum) hpNum.textContent = Math.round(Math.max(0, gameState.playerHp)) + ' HP';
 
   const chargeEl = document.getElementById('playerChargeBar');
-  if (chargeEl) chargeEl.style.width = (gameState.playerCharge * 100) + '%';
+  if (chargeEl) chargeEl.style.width = (gameState.playerCharge * 200) + '%';
 
   const bossBar = document.getElementById('bossHealthBar');
-  if (bossBar) bossBar.style.width = Math.max(0, gameState.bossHp) + '%';
+  if (bossBar) bossBar.style.width = (Math.max(0, gameState.bossHp) / gameState.bossMaxHp * 200) + '%';
   const bossHpPct = document.getElementById('bossHpPercent');
-  if (bossHpPct) bossHpPct.textContent = Math.round(Math.max(0, gameState.bossHp)) + '%';
+  if (bossHpPct) bossHpPct.textContent = Math.round(Math.max(0, gameState.bossHp)) + ' HP';
 
   const badge = document.getElementById('bossPhaseTag');
   if (badge) {
@@ -1655,7 +1670,7 @@ function playerNormalAttack() {
     AudioSFX.hitImpact();
     triggerScreenShake(4);
     spawnHitSparks(bScreenX, bScreenY - 40, '#00e5ff', 8);
-    showDamageNumber('-3.5%', bScreenX + (Math.random()-0.5)*30, bScreenY - 60, '#00e5ff');
+    showDamageNumber('-6%', bScreenX + (Math.random()-0.5)*30, bScreenY - 60, '#00e5ff');
   }
 
   gameState.minions.forEach(function(min) {
@@ -1705,6 +1720,17 @@ function releasePlayerCharge() {
   gameState.playerCharge = 0;
 }
 
+function playerMegaAttack() {
+  if (gameState.current !== GAME_STATES.BOSS_BATTLE || gameState.megaAttackCd > 0) return;
+  gameState.megaAttackCd = 8;
+  gameState.playerSwingT = 1.8;
+  AudioSFX.chargedLaser();
+  triggerScreenShake(16);
+  damageBoss(100, true);
+  spawnHitSparks(gameState.bossX * W, gameState.bossY * H - 40, '#ff2a4b', 30);
+  showDamageNumber('-100 HP', gameState.bossX * W, gameState.bossY * H - 90, '#ff2a4b');
+}
+
 function playerDodge() {
   if (gameState.current !== GAME_STATES.BOSS_BATTLE && gameState.current !== GAME_STATES.PROLOGUE) return;
   if (gameState.playerDodgeCd > 0) return;
@@ -1716,8 +1742,8 @@ function playerDodge() {
   spawnHitSparks(gameState.playerX * W, gameState.playerY * H, '#5ff5e0', 8);
 }
 
-function damageBoss(amount) {
-  if (gameState.bossInvulnT > 0) return;
+function damageBoss(amount, bypassInvulnerability) {
+  if (gameState.bossInvulnT > 0 && !bypassInvulnerability) return;
   gameState.bossHp -= amount;
 
   if (gameState.bossHp <= 70 && gameState.bossPhase === 1) {
@@ -1737,6 +1763,7 @@ function damageBoss(amount) {
     gameState.bossHp = 0;
     triggerVictoryFakeOut();
   }
+  updateHUDUI();
 }
 
 /* 100 HP Rule: Instant Defeat on 0 HP (No Hearts) */
@@ -2085,6 +2112,10 @@ window.addEventListener('keydown', function(e) {
     playerNormalAttack();
   } else if (e.key.toLowerCase() === 'f') {
     startPlayerCharge();
+  } else if (e.key.toLowerCase() === 'q') {
+    e.preventDefault();
+    unlockAudio();
+    playerMegaAttack();
   }
 });
 
@@ -2191,6 +2222,19 @@ btnAtk.addEventListener('pointerup', endAtk);
 btnAtk.addEventListener('pointercancel', endAtk);
 btnAtk.addEventListener('pointerleave', endAtk);
 
+const btnMegaAttack = document.getElementById('btnMegaAttack');
+btnMegaAttack.addEventListener('pointerdown', function(e) {
+  e.preventDefault();
+  unlockAudio();
+  btnMegaAttack.classList.add('active');
+  playerMegaAttack();
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach(function(eventName) {
+  btnMegaAttack.addEventListener(eventName, function() {
+    btnMegaAttack.classList.remove('active');
+  });
+});
+
 const btnDdg = document.getElementById('btnDodge');
 btnDdg.addEventListener('pointerdown', function(e) {
   e.preventDefault();
@@ -2247,6 +2291,7 @@ function gameLoop(timestamp) {
 
   // Attack cooldown decay
   if (gameState.playerAtkCd > 0) gameState.playerAtkCd -= dt;
+  if (gameState.megaAttackCd > 0) gameState.megaAttackCd -= dt;
 
   // Simultaneous continuous attack when button is held down while moving!
   if (gameState.isHoldingAttack && gameState.playerAtkCd <= 0) {
